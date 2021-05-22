@@ -1,0 +1,42 @@
+;
+; Buzzer.asm
+;
+; Created: 2021/3/13 2:10:48
+; Author : Exia
+;
+
+; Sound the buzzer at an audible frequency  80~20000Hz ~~>10kHz
+; 4MHz/10kHz=40
+; Output: PB1,   POTRB,1 ---> Input: DDRB,0
+
+.INCLUDE "m328pdef.inc"   ; Load addresses of (I/O) registers
+
+.ORG 0x0000
+RJMP init
+
+init:
+CBI DDRB,1    ; Set PINB as input
+SBI PORTB,1   ; Output is the buzzer PB1
+
+LDI R16,0xFF
+LDI R17,0xFF 
+Loop1:    ;generate signal
+	NOP
+
+	DEC R16
+	BRNE Loop1
+	DEC R17
+	BRNE Loop1
+	SBI DDRB,1
+
+LDI R16,0xFF 
+LDI R17,0xFF 
+Loop2:
+	NOP
+
+	DEC R16
+	BRNE Loop2
+	DEC R17
+	BRNE Loop2
+	RJMP init
+
