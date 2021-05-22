@@ -1,0 +1,37 @@
+;
+; Task2.asm
+; turn on the lower LED when the switch is in the HIGH state
+
+; Created: 2021/3/5 20:24:37
+; Author : Exia
+;
+; switch => PB0
+
+.INCLUDE "m328pdef.inc"
+
+.ORG 0x0000
+RJMP init   ; First instruction that is executed by the microcontroller
+
+init:
+; Configure input pin PB0
+CBI DDRB,0     ;Pin PB0 is an input
+SBI PORTB,0
+;Configure output pin PC3
+SBI DDRC,3     ;Pin PC3 is an output
+SBI PORTC,3    ; Output Vcc-->LED is off
+
+main:
+;Get value of PINB
+IN R0,PINB
+BST R0,0  ; Copy PB0 to the T flag
+
+; The switch is high and the T flag is cleared
+BRTC SwitchHigh
+
+SwitchNotHigh:
+  CBI PORTC,3  ;Turn off LED2
+  RJMP main
+
+SwitchHigh:
+  SBI PORTC,3  ;Turn on LED2
+  RJMP main
