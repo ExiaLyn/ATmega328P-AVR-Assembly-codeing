@@ -1,0 +1,66 @@
+;
+; LED Blink.asm
+;
+; Created: 2021/3/7 11:10:37
+; Author : Exia
+;
+
+
+;Visable blinks==> ~80Hz  ---> ~0.02s
+;4MHz==> 0.25us/cycle  =====> ~10^5 cycles = 100000
+; 8bit=256, 2*8bit=65536, ---->   >2*NOP in a loop
+
+.INCLUDE "m328pdef.inc"  ; Load addresses of (I/O) registers
+.ORG 0x0000
+
+
+RJMP init ; First instruction that is executed by the microcontroller
+
+init:
+;Configure output pin PC2
+SBI DDRC,2 ; Pin PC2 is an output
+;SBI PORTC,2 ; Output Vcc => LED1 is turned off!
+
+
+
+Loop:  ; need two loop to achieve a 2*8bit-cycle
+	SBI PORTC,2 ; Turn on LED
+	LDI R17,0xFF  
+	LDI R16,0xFF  ;  Blinking with two loops can be observed, but the blinking frequency is high 
+	LDI R18,0x0F  ;  Additional counter, to reduce the blinking frequency
+Loop1:
+    NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	
+	DEC R16      ;1st 8bit
+	BRNE Loop1   ;If not 0, do the loop1 ===> 256 cycles
+	DEC R17      ;If R16 counts to 0, do the 2nd 8bit--->256*256
+	BRNE Loop1   ;
+	DEC R18
+	BRNE Loop1
+	CBI PORTC,2 ; Turn Off LED
+
+	LDI R17,0xFF
+	LDI R16,0xFF
+	LDI R18,0x0F
+Loop2:
+    NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	NOP
+	
+	DEC R16
+	BRNE Loop2
+	DEC R17
+	BRNE Loop2
+	DEC R18
+	BRNE Loop2
+	RJMP Loop
