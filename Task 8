@@ -1,0 +1,112 @@
+;
+; ScreenTest2.asm
+;
+; Created: 2021/5/11 17:14:29
+; Author : Exia
+;
+
+.INCLUDE "m328pdef.inc"
+.ORG 0x0000
+.DEF TEMP = R16
+RJMP Init
+
+Init:
+    SBI DDRB,3   
+    SBI DDRB,4
+    SBI DDRB,5
+
+    LDI TEMP,1
+
+SavedPattern:  
+;Define a 2*2 dots Square, Initial position: ((2,2)(2,3)(3,2)(3,3)) at the top-left corner.
+; Write Byte To Screen Buffer (80bits/row * 7rows = 560 bits -> 70 bytes)
+	LDI ZL,0x00;YL,0x00
+	LDI ZH,0x01;YH,0X00
+; divide the screen into 8rows*10bytes  , but 10 bytes are not used
+; Careful !!!    data are loaded inversely !!!
+	LDI R18,0b00000000    ; 1 byte 
+	LDI R19,30       ; Count to 30 bytes
+
+Pattern:
+	ST Z+,R18;Y+,R18   ;Load R18 into Z, then Z=Z+1
+	DEC R19     ;repeat 30 times ---> turn off these dots
+	BRNE Pattern
+	LDI R18,0b11111111  
+	ST Z+,R18;Y+,R18    ;Load 0b01100000 to the 31th byte
+	LDI R19,49   ;80-30-1=49
+	LDI R18,0B00000000
+
+FillTheRest:  ;Set the rest 
+	ST Z+,R18;Y+,R18
+	DEC R19
+	BRNE FillTheRest
+
+
+;Using ROR to shift data, so the pattern is should be shifted inversely
+;Same for steps of displaying other parts 
+DrawPattern:
+	LDI TEMP,0x01
+;sent column data
+	LDI ZL,0x00    ; 80 bytes
+	LDI ZH,0x01
+
+InitBufferForPattern: ;Write row by row
+	LDI R22,5   ; One row = 40bits = 5 bytes 
+
+ReadBufferPattern:
+	LD R18,Z+   ; Load value in Z(address) to R18
+	LDI R20,8
+	CLC
+
+ShiftPattern:      ;Shift data to PB3
+	CBI PORTB,3
+	ROR R18
+	BRCC CarryIs0Pattern
+	SBI PORTB,3
+	CarryIs0Pattern:
+		CBI PORTB,5
+		SBI PORTB,5
+	DEC R20
+	BRNE ShiftPattern    ;Repeat for all 8bits in R18
+	DEC R22
+	BRNE ReadBufferPattern    ;Repeat to set all dots in a row
+	LDI R18,35;40    ;Jump to the next row
+	ADD R30,R18
+	LDI R22,5     ;Reset R22 to 5 
+
+Send1RowPattern:
+;sent column data
+	LDI R20,8 
+	CLC
+	RORLoopPattern:
+		CBI PORTB,3
+		ROR TEMP
+		BRCS CarryIs1Pattern
+		SBI PORTB,3
+		CarryIs1Pattern:
+			CBI PORTB,5
+			SBI PORTB,5
+		DEC R20
+		BRNE RORLoopPattern
+
+DisplayPattern:
+	LDI R20,5;1
+	CBI PORTB,4    ;Rising edge at PB4
+	SBI PORTB,4
+	Delay2Pattern:  ;Delay
+		LDI R21,0xFF
+	Delay1Pattern:
+		DEC R21
+		BRNE Delay1Pattern
+		DEC R20
+	BRNE Delay2Pattern
+	CBI PORTB,4    ;Enable output
+
+	LDI R18,40 
+	SUB R30,R18
+	
+	TST TEMP    ;Test TEMP for being 0
+	BRNE InitBufferForPattern
+
+
+;Screen works, but the pattern is not same as the expectation...
