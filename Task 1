@@ -1,0 +1,42 @@
+;
+; LED.asm
+;
+; Created: 04/03/2021 22:08:47
+; Author : Exia
+;
+
+
+; LED1=> PC2,  LED2=>PC3
+
+.INCLUDE "m328pdef.Inc"
+
+.ORG 0x0000
+RJMP init
+
+init: 
+;pin configuration   #PB2 as input
+CBI DDRB,2  ; SET DDRB2 as input, #1---output is Pxn
+SBI PORTB,2  ; Enable the pull-up resistor
+
+; output
+SBI DDRC,2  ;PIN PC2 as the output
+SBI PORTC,2  ;Output Vcc=> LED1 is turnedoff!
+
+main:
+;GET THE VALUE OF PINB
+IN R0,PINB
+
+; Copy PB2 (bit 2 of PINB)
+; to the T flag
+BST R0,2
+
+; The joystick is pressed of the T flag is cleared
+BRTC JoyPressed
+
+JoyNotPressed:
+  SBI PORTC,2  ;TURN Off LED1
+  RJMP main
+
+Joypressed:
+  CBI PORTC,2  ; TURN ON LED1
+  RJMP main
