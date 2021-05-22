@@ -1,0 +1,160 @@
+;
+; keyboard.asm
+;
+; Created: 2021/3/21 23:05:34
+; Author : Exia
+
+;TASK:
+;Button 7: Two leds on
+;Button 8: Bottom led on
+;Button 4: Top Led on
+;All other buttons: Buzzer on
+;No buttons pressed: Leds and buzzer off
+
+
+;4,7,8----> if any button on r1,r2 is pressed, buzzer works
+;buzzer works when buttons are pressed except the one at r3c1 (4)
+
+.INCLUDE "m328pdef.inc"
+
+.ORG 0x0000
+.DEF TEMP = R16
+RJMP Init
+
+Init:
+; the rows are outputs and the columns are inputs
+;Input --- PD0-3 ; columns
+    CBI DDRD,0    ; direction columns (pin PD0)
+	CBI DDRD,1
+	CBI DDRD,2
+	CBI DDRD,3
+;Output --- PD4-7  rows
+	SBI DDRD,4
+	SBI DDRD,5
+	SBI DDRD,6
+	SBI DDRD,7
+
+;when no button is pressed, the columns are pulled to 1 
+;No buttons pressed --> read a “1”,     One button pressed---> read a “0”
+    SBI PORTD,0   ;Initial Input(columns) to switch on pull-up resistor
+	SBI PORTD,1
+	SBI PORTD,2
+    SBI PORTD,3
+	SBI PORTD,4   ;Initial Output(rows) to High , then send a low signal one by one 
+	SBI PORTD,5
+    SBI PORTD,6
+	SBI PORTD,7
+
+    SBI DDRB,1   ;Output --- Buzzer
+	SBI DDRC,2   ;Output --- LED2
+	SBI DDRC,3   ;Output --- LED3
+	SBI PORTC,2   ;Initialize LED2 OFF
+	SBI PORTC,3   ;Initialize LED3 OFF
+    RJMP Main
+
+Main:
+NOP
+RJMP Scan1Row
+
+;Only the column of PD0 doesn't trigger the Buzzer??
+Scan1Row:  ;Scan the 4 rows one by one by sending a low signal
+    CBI PORTD,4  ;send a low signal to the lowest row, then start scanning the 4 columns
+
+	SBIS PIND,0  ;Skip next instruction if the PORTD0 is high--->not button is pressed;
+    RJMP Buzzer  ;C4Pressed -- C is pressed --> Buzzer
+
+	SBIS PIND,1  
+    RJMP Buzzer   ;C3Pressed -- B,3,6,9 is pressed --> Buzzer
+
+    SBIS PIND,2  
+    RJMP Buzzer   
+
+    SBIS PIND,3 
+    RJMP Buzzer    
+	SBI PORTD,4  ;Reset the row to high
+	RJMP Scan2Row
+
+Scan2Row:
+    CBI PORTD,5  ;send a low signal to the 2nd lowest row, then start scanning the 4 columns
+
+	SBIS PIND,0  ;Skip next instruction if the PD0 is high--->not button is pressed
+    RJMP Buzzer  ;C4Pressed -- D is pressed --> Buzzer
+
+	SBIS PIND,1  
+    RJMP Buzzer   ;C3Pressed -- B,3,6,9 is pressed --> Buzzer
+
+    SBIS PIND,2  
+    RJMP Buzzer
+
+    SBIS PIND,3 
+    RJMP Buzzer
+	SBI PORTD,5  ;Reset the row to high
+	RJMP Scan3Row
+
+Scan3Row:
+    CBI PORTD,6  ;send a low signal to the 3rd row, then start scanning the 4 columns
+
+	SBIS PIND,0  ;Skip next instruction if the PD0 is high--->not button is pressed
+    RJMP Buzzer  ;C4Pressed -- E is pressed --> Buzzer
+
+	SBIS PIND,1  
+    RJMP Buzzer   ;C3Pressed -- B,3,6,9 is pressed --> Buzzer
+
+    SBIS PIND,2  
+    RJMP Buzzer
+
+    SBIS PIND,3 
+    RJMP B4Pressed
+	SBI PORTD,6  ;Reset the row to high
+	RJMP Scan4Row
+
+Scan4Row:
+    CBI PORTD,7  ;send a low signal to the 4th row, then start scanning the 4 columns
+
+	SBIS PIND,0  ;Skip next instruction if the PD0 is high--->not button is pressed
+    RJMP Buzzer  ;C4Pressed -- F is pressed --> Buzzer
+
+	SBIS PIND,1  
+    RJMP Buzzer   ;C3Pressed -- B,3,6,9 is pressed --> Buzzer
+
+    SBIS PIND,2  
+    RJMP B8Pressed
+
+    SBIS PIND,3 
+    RJMP B7Pressed
+	SBI PORTD,7  ;Reset the row to high
+	RJMP Main
+    ;SBIC PIND,1 ; Skip next instruction if bit 1 of pin D is cleared
+
+
+;Button 7: Two leds on
+B7Pressed:
+	CBI PORTC,2   ;LED2 ON
+	CBI PORTC,3   ;LED3 ON
+	RJMP Init
+
+;Button 8: Bottom led on
+B8Pressed:
+    CBI PORTC,3   ;LED3 ON
+	RJMP Init
+
+;Button 4: Top Led on
+B4Pressed:
+	CBI PORTC,2   ;LED2 ON
+	RJMP Init
+
+;All other buttons:
+Buzzer:   ;Buzzer works     
+   SBI PORTB, 1          ; High voltage
+   RCALL Delay          ; Call subroutine to hold the signal
+   CBI PORTB, 1          ; Low voltage on Buzzer
+   RCALL Delay           
+   RJMP Init     ; loop back to the start ----check the button
+
+Delay:  ;hold the signal
+   LDI TEMP,0            ; set TEMP to 0.   
+   Loop:
+     INC TEMP
+     CPI TEMP,255
+   BRNE Loop  ; branch -- back to Loop if not equal 
+   RET                  ;Return from subroutine
