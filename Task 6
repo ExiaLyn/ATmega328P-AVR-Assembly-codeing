@@ -1,0 +1,100 @@
+;
+; 2_frequency.asm
+;
+;Sound the buzzer at a frequency of 440 Hz or 880 Hz depending on the state of the switch
+;
+; Created: 2021/3/20 17:37:42
+; Author : Exia
+;
+;switch(PB0)=HIGH--->1==880Hz, =LOW--->0==440Hz
+
+;440Hz, timer is 880Hz ---> 880Hz, timer set to 1760Hz;
+;440Hz--> 2/4,  880Hz--> 1/2
+;frequencies are good.  Need to make the switch work.
+
+.INCLUDE "m328pDEF.inc"   ; Load addresses of (I/O) registers
+
+.DEF TEMP = R16
+.DEF OverFlows = R17
+
+
+.ORG 0x0000              
+RJMP Init               
+                         
+.ORG 0x0020              ; Timer/Counter0 Overflow
+RJMP Timer0overflowInterrupt    ; Go here if a timer0 overflow interrupt occurs 
+
+;============
+
+Init:  ;PB1-->Output,  PB0-->Input
+   CBI DDRB,0   ;PB0 input
+   SBI PORTB,0  ; enable pull-up resistor to avoid float
+   SBI DDRB,1   ;Output PB1
+   ;CBI PORTB,1  ;Low voltage (NO voltage)
+
+   ;precaler Timer0 to 64,    CS02, CS01, CS00 to 0,1,1
+   LDI TEMP,  0b00000011
+   OUT TCCR0B, TEMP      
+   ; set the Timer Overflow Interrupt Enable (TOIE0)                    
+   LDI TEMP, 0b00000001
+   STS TIMSK0, TEMP      
+   ; enable global interrupts
+   SEI                 
+   ;TCNT = 256-16000000/64/1760=113.95=114     ----1760Hz
+   LDI TEMP, 114
+   OUT TCNT0, TEMP       ; initialize the Timer0     
+
+;Switch to change the frequency
+Switch:
+   IN R0,PINB ; Get value of PINB
+   BST R0,0 ; Copy PB0 (bit 0 of PINB) to the T flag
+   BRTC SwitchLow  ;;flag is cleared when switch to LOW(0) 
+   ;RJMP SwitchHigh
+
+SwitchHigh:  ;Buzzer works at Low frequency -- 880Hz
+   ;CBI PORTB,1 ; Low voltage on Buzzer
+   RJMP BuzzerHigh;Switch ; Create an infinite loop
+   ;RJMP Switch
+
+BuzzerHigh:   ;Infinite Main Loop
+   SBI PORTB, 1          ; High voltage
+   RCALL DelayHigh          ; Call subroutine--- delay 880Hz
+   CBI PORTB, 1          ; Low voltage on Buzzer
+   RCALL DelayHigh           ; delay 880Hz
+   RJMP Switch;BuzzerHigh          ; loop back to the start
+
+DelayHigh:  ;hold the signal
+   LDI OverFlows,0         ; set OverFlows to 0 
+   Loop1:
+     CPI OverFlows,1 ; compare number of OverFlows and 1===> 1/2 duty -- refer to the OverFlows in Timer0overflowInterrupt
+   BRNE Loop1        ; branch -- back to Loop if not equal 
+   RET                  ;Return from subroutine--- if 1 OverFlows have occured return to Buzzer
+
+SwitchLow:  ;Buzzer works at high frequency -- 440Hz
+   ;SBI PORTB,1; High voltage
+   RJMP BuzzerLow
+   ;RJMP Switch
+
+; Main body of program==========
+BuzzerLow:   ;Infinite Main Loop
+   SBI PORTB, 1          ; High voltage
+   RCALL DelayLow           ; Call subroutine--- delay 440Hz
+   CBI PORTB, 1          ; Low voltage on Buzzer
+   RCALL DelayLow           ; delay 440Hz
+   RJMP Switch;BuzzerLow    ; loop back to the start
+
+DelayLow:  ;hold the signal
+   LDI OverFlows,0         ; set OverFlows to 0 
+   Loop2:
+     CPI OverFlows,2 ; compare number of OverFlows and 1===> 1/2 duty -- refer to the OverFlows in Timer0overflowInterrupt
+   BRNE Loop2        ; branch -- back to Loop if not equal 
+   RET                  ;Return from subroutine--- if 1 OverFlows have occured return to Buzzer
+
+Timer0overflowInterrupt : 
+   LDI TEMP, 114  ;Reset the value of Timer
+   OUT TCNT0, TEMP 
+   INC OverFlows         ; add 1 to the OverFlows variable
+   CPI OverFlows, 4      ; 2 times of the overflow happened 
+   BRNE PC+2             ; Program Counter + 2 (skip next line) if not equal
+   LDI OverFlows,0         ; if 2 OverFlows occured reset the counter to zero
+   RETI                  ; return from interrupt
