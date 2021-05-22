@@ -1,7 +1,7 @@
 # ATmega328P-AVR-Assembly-codeing
 ATmega328P AVR programs coding in Assembly
 
-Several coding tasks in assembly language
+
 
 Task 1: Turn on the upper LED when the JOYSTICK is pressed.
 Task 2: Turn on the lower LED when the SWITCH is HIGH
