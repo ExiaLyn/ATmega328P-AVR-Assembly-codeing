@@ -1,0 +1,88 @@
+;
+; buzzer_with_button.asm
+;
+; Created: 2021/3/11 9:34:04
+; Author : Exia
+;
+
+;Sound the buzzer at a frequency of 440Hz when the button is pressed
+; OUTput: PB1,   POTRB,1 ---> Input: DDRB,1
+; TCNT_init=0xFF - f_clk/f = 256 - f_clk/440    
+; prescaler: no prescaler,8,64,256,1024
+; for a signal with f=440Hz and 0.5 duty===>880Hz 
+; precaler 1024, TCNT0 = 256-16000000/1024/880=238.2-->238
+; precaler 256, TCNT0 = 256-16000000/256/880=184.97->185 =====> USE THIS!!!
+
+
+.INCLUDE "m328pDEF.inc"   ; Load addresses of (I/O) registers
+
+.DEF TEMP = R16
+.DEF OverFlows = R17
+
+
+.ORG 0x0000              
+RJMP Init               
+                         
+.ORG 0x0020              ; Timer/Counter0 Overflow
+RJMP Timer0overflowInterrupt    ; Go here if a timer0 overflow interrupt occurs 
+
+;============
+
+Init:  ;PB1-->Output,  PB2-->Input
+   CBI DDRB,2   ;PB2 input
+   SBI PORTB,2  ; enable pull-up resistor to avoid float
+   SBI DDRB,1   ;Output PB1
+   ;CBI PORTB,1  ;Low voltage (NO voltage)
+
+   ;precaler Timer0 to 256,    CS02, CS01, CS00 to 1,0,0
+   LDI TEMP,  0b00000100
+   OUT TCCR0B, TEMP      
+   ; set the Timer Overflow Interrupt Enable (TOIE0)                    
+   LDI TEMP, 0b00000001
+   STS TIMSK0, TEMP      
+   ; enable global interrupts
+   SEI                 
+   ;TCNT = 256-16000000/256/880=185
+   LDI TEMP, 185
+   OUT TCNT0, TEMP       ; initialize the Timer0     
+
+
+
+;Joystick pressed or not
+Joystick:
+   IN R0,PINB ; Get value of PINB
+   BST R0,2 ; Copy PB2 (bit 2 of PINB) to the T flag
+   BRTC JoyPressed 
+
+JoyNotPressed:
+   CBI PORTB,1 ; Low voltage on Buzzer
+   RJMP Joystick ; Create an infinite loop
+
+JoyPressed:  ;button pressed, start generating the buzzer signal
+   ;SBI PORTB,1; High voltage
+   RJMP Buzzer
+   ;RJMP Joystick  --- Does not work, don't know how to turn off the buzzer when the stick is released  
+
+; Main body of program==========
+Buzzer:   ;Infinite Main Loop
+   SBI PORTB, 1          ; High voltage
+   RCALL Delay           ; Call subroutine--- delay 880Hz
+   CBI PORTB, 1          ; Low voltage on Buzzer
+   RCALL Delay           ; delay 880Hz
+   RJMP Buzzer           ; loop back to the start
+
+Delay:  ;hold the signal
+   LDI OverFlows,0         ; set OverFlows to 0 
+   Loop:
+     CPI OverFlows,1 ; compare number of OverFlows and 1===> 1/2 duty -- refer to the OverFlows in Timer0overflowInterrupt
+   BRNE Loop        ; branch -- back to Loop if not equal 
+   RET                  ;Return from subroutine--- if 1 OverFlows have occured return to Buzzer
+
+Timer0overflowInterrupt : 
+   LDI TEMP, 185  ;Reset the value of Timer
+   OUT TCNT0, TEMP 
+   INC OverFlows         ; add 1 to the OverFlows variable
+   CPI OverFlows, 2      ; 2 times of the overflow happened 
+   BRNE PC+2             ; Program Counter + 2 (skip next line) if not equal
+   LDI OverFlows,0         ; if 2 OverFlows occured reset the counter to zero
+   RETI                  ; return from interrupt
